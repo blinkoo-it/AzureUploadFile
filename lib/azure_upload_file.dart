@@ -1,7 +1,6 @@
 library azure_upload_file;
 
 import 'package:azure_upload_file/src/azure_storage.dart';
-import 'package:azure_upload_file/src/file_to_upload.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:rxdart/rxdart.dart';
@@ -9,7 +8,6 @@ import 'package:async/async.dart';
 import 'package:cross_file/cross_file.dart';
 
 export 'src/azure_storage.dart';
-export 'src/file_to_upload.dart';
 
 class AzureUploadFile {
   late BehaviorSubject<double> progress;
@@ -17,6 +15,10 @@ class AzureUploadFile {
   late Box box;
   late ChunkedStreamReader<int> fileReader;
   late AzureStorage azureStorage;
+
+  static const String _filePathKey = 'filePath';
+  static const String _positionUploadedKey = 'positionUploaded';
+  static const String _fileNameWithoutExtKey = 'fileNameWithoutExt';
 
   AzureUploadFile.initWithSasLink(String sasLink) {
     azureStorage = AzureStorage.parseSasLink(sasLink);
@@ -33,9 +35,11 @@ class AzureUploadFile {
     if(box.isEmpty) {
       throw Exception("Not found upload to resume");
     }
-    var fileUpload = box.get(0) as FileToUpload;
-    var file = XFile(fileUpload.path);
-    uploadProcessToken =  CancelableOperation.fromFuture(_uploadFileInternal(file, fromPosition: fileUpload.positionUploaded));
+    var filePath = box.get(_filePathKey) as String;
+    var positionToUpload = box.get(_positionUploadedKey) as int;
+    var fileNameWithoutExt = box.get(_fileNameWithoutExtKey, defaultValue: 'video') as String;
+    var file = XFile(filePath);
+    uploadProcessToken =  CancelableOperation.fromFuture(_uploadFileInternal(file, fileNameWithoutExt: fileNameWithoutExt, fromPosition: positionToUpload));
     return progress;
   }
 
@@ -59,38 +63,39 @@ class AzureUploadFile {
     const int chunkSize = 1024 * 1024;
     String fileName = "$fileNameWithoutExt.${file.path.split('.').last}";
     int end = await file.length();
+    int positionUploaded = fromPosition;
     box = await Hive.openBox('fileUpload');
 
-    var fileUpload = FileToUpload()
-      ..path = file.path
-      ..positionUploaded = fromPosition;
     if(box.isNotEmpty) {
       await box.clear();
     }
-    box.add(fileUpload);
 
-    fileReader = ChunkedStreamReader(file.openRead(fileUpload.positionUploaded * chunkSize));
+    await box.put(_filePathKey, file.path);
+    await box.put(_positionUploadedKey, positionUploaded);
+    await box.put(_fileNameWithoutExtKey, fileNameWithoutExt);
+
+    fileReader = ChunkedStreamReader(file.openRead(positionUploaded * chunkSize));
     try {
-      progress.add((fileUpload.positionUploaded * chunkSize) / end);
+      progress.add((positionUploaded * chunkSize) / end);
       var nextBytes = await fileReader.readBytes(chunkSize);
       while(nextBytes.isNotEmpty && !uploadProcessToken.isCanceled) {
-        if(fileUpload.positionUploaded == 0) {
-          await azureStorage.putBlob(fileName, bodyBytes: nextBytes, contentType: mime(fileUpload.path), type: BlobType.AppendBlob);
+        if(positionUploaded == 0) {
+          await azureStorage.putBlob(fileName, bodyBytes: nextBytes, contentType: mime(file.path), type: BlobType.AppendBlob);
         } else {
           await azureStorage.appendBlock(fileName, bodyBytes: nextBytes);
         }
-        fileUpload.positionUploaded++;
-        await fileUpload.save();
+        positionUploaded++;
+        await box.put(_positionUploadedKey, positionUploaded);
         if(nextBytes.length < chunkSize) {
           progress.add(1.0);
         } else {
-          progress.add((fileUpload.positionUploaded * chunkSize) / end);
+          progress.add((positionUploaded * chunkSize) / end);
         }
         nextBytes = await fileReader.readBytes(chunkSize);
       }
       if(!uploadProcessToken.isCanceled) {
         progress.close();
-        fileUpload.delete();
+        box.clear();
       } else {
         await _onCancelUpload();
       }

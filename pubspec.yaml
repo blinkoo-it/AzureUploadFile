@@ -1,6 +1,6 @@
 name: azure_upload_file
 description: A Flutter package to upload file on azure with sas link.
-version: 1.0.1
+version: 1.0.2
 homepage:
 
 environment:
@@ -18,13 +18,11 @@ dependencies:
   mime_type: ^1.0.0
   cross_file: ^0.3.2
   http: ^0.13.4
-  hive_generator: ^1.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^1.0.0
-  build_runner: ^2.1.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
