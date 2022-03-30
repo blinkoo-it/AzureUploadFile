@@ -9,6 +9,7 @@ import 'package:async/async.dart';
 import 'package:cross_file/cross_file.dart';
 
 export 'src/azure_storage.dart';
+export 'src/file_to_upload.dart';
 
 class AzureUploadFile {
   late BehaviorSubject<double> progress;
