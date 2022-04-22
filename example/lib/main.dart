@@ -64,7 +64,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     await Hive.initFlutter();
 
-    azureStorage = AzureUploadFile.initWithSasLink('https://amsstoragestage.blob.core.windows.net/temp-4e380079-38ec-48df-a774-78f6f95db7a0?sv=2020-08-04&se=2022-03-31T00%3A38%3A31Z&sr=c&sp=rw&sig=0Bf7x6zPUJdKV9sZDpwAiXrh6JLmAxskWN2pMxCzRus%3D');
+    azureStorage = AzureUploadFile();
+    await azureStorage.config();
+    azureStorage.initWithSasLink('https://amsstoragestage.blob.core.windows.net/temp-7372dc35-5a55-49f5-9853-ee7975ab7213?sv=2020-08-04&se=2022-04-22T22%3A28%3A21Z&sr=c&sp=rw&sig=hq7q8uyxK3v%2Foj7Hhtb%2BTvYpwqScfiR20LU%2FsFSHu%2BM%3D');
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     azureStorage.uploadFile(video).listen((event) {
       _counter = event * 100;
@@ -91,6 +93,12 @@ class _MyHomePageState extends State<MyHomePage> {
   void cancelVideo() async {
     if(azureStorage != null) {
       await azureStorage.stopUpload();
+    }
+  }
+
+  void pauseVideo() async {
+    if(azureStorage != null) {
+      await azureStorage.pauseUpload();
     }
   }
 
@@ -134,6 +142,9 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             TextButton(onPressed: pickVideo, child: const Text(
               'Click',
+            )),
+            TextButton(onPressed: pauseVideo, child: const Text(
+              'Pause',
             )),
             TextButton(onPressed: cancelVideo, child: const Text(
               'Cancel',

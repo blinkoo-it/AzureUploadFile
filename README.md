@@ -11,7 +11,9 @@ import 'package:azure_upload_file/azure_upload_file.dart';
 
 main() async {
   final file = XFile('assets/hello.txt');
-  var storage = AzureUploadFile.initWithSasLink('your sas link');
+  var storage = AzureUploadFile();
+  await storage.config();
+  storage.initWithSasLink('your sas link');
   storage
       .uploadFile(file)
       .listen(
@@ -22,11 +24,28 @@ main() async {
 }
 ```
 
-There is the possibility to resume upload
+There is the possibility to pause and resume upload
 
 ```dart
 main() async {
-  storage.resumeUploadFile();
+  await storage.pauseUpload();
+  storage
+      .resumeUploadFile()
+      .listen(
+          (progress) => print('Your upload progress $progress'),
+          onError: (error, stackTrace) {},
+          onComplete: () => print('Completed')
+  );
+}
+```
+
+the ability to check if there is an upload in pause
+
+```dart
+main() async {
+  if(storage.isPresentUploadToResume()) {
+    //Insert code here
+  }
 }
 ```
 
