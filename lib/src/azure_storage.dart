@@ -95,6 +95,39 @@ class AzureStorage {
     throw AzureStorageException(message, res.statusCode, res.headers);
   }
 
+  /// 
+  /// GetBlobMeta
+  ///
+  /// `body` and `bodyBytes` are exclusive and mandatory.
+  Future<Map<String, String>> getBlobMetaData(String fileName,
+      { Map<String, String>? headers}) async {
+    var request = http.Request('HEAD', _uri(fileName: fileName));
+    
+    if (headers != null) {
+      headers.forEach((key, value) {
+        request.headers['x-ms-meta-$key'] = value;
+      });
+    }
+    // if (contentType != null) request.headers['content-type'] = contentType;
+    
+    // if (type == BlobType.BlockBlob) {
+    //   if (bodyBytes != null) {
+    //     request.bodyBytes = bodyBytes;
+    //   } else if (body != null) {
+    //     request.body = body;
+    //   }
+    // } else {
+    //   request.body = '';
+    // }
+    var res = await request.send();
+    if (res.statusCode == 200) {
+      return res.headers;
+    }
+
+    var message = await res.stream.bytesToString();
+    throw AzureStorageException(message, res.statusCode, res.headers);
+  }
+
   /// Append block to blob.
   Future<void> appendBlock(String fileName,
       {String? body, Uint8List? bodyBytes}) async {
