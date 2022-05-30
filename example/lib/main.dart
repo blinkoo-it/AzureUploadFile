@@ -66,7 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     azureStorage = AzureUploadFile();
     await azureStorage.config();
-    azureStorage.initWithSasLink('https://amsstoragestage.blob.core.windows.net/temp-7372dc35-5a55-49f5-9853-ee7975ab7213?sv=2020-08-04&se=2022-04-22T22%3A28%3A21Z&sr=c&sp=rw&sig=hq7q8uyxK3v%2Foj7Hhtb%2BTvYpwqScfiR20LU%2FsFSHu%2BM%3D');
+    azureStorage.initWithSasLink('https://amsstoragestage.blob.core.windows.net/temp-828f51c9-25a1-4198-81fa-ab302fae254d?sv=2020-08-04&se=2022-05-30T22%3A32%3A15Z&sr=c&sp=rw&sig=HVUJQc%2Fl2LRIQmcpPwW%2BWa2dwDMKCWH%2BduRK%2F9W4PSI%3D');
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     azureStorage.uploadFile(video).listen((event) {
       _counter = event * 100;
@@ -89,6 +89,13 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
   }
+
+  // void getVideoMeta() async {
+  //   if(azureStorage != null) {
+  //     await azureStorage.getVideoMeta();
+  //   }
+  // }
+
 
   void cancelVideo() async {
     if(azureStorage != null) {
@@ -148,7 +155,10 @@ class _MyHomePageState extends State<MyHomePage> {
             )),
             TextButton(onPressed: cancelVideo, child: const Text(
               'Cancel',
-            ))
+            )),
+            // TextButton(onPressed: getVideoMeta, child: const Text(
+            //   'GET VIDEO META',
+            // ))
           ],
         ),
       ),

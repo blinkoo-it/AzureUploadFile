@@ -62,7 +62,8 @@ class AzureStorage {
         Uint8List? bodyBytes,
         String? contentType,
         BlobType type = BlobType.BlockBlob,
-        Map<String, String>? headers}) async {
+        Map<String, String>? headers,
+        Map<String, String>? appendHeaders}) async {
     var request = http.Request('PUT', _uri(fileName: fileName));
     request.headers['x-ms-blob-type'] =
     type.toString() == 'BlobType.AppendBlob' ? 'AppendBlob' : 'BlockBlob';
@@ -86,7 +87,7 @@ class AzureStorage {
     if (res.statusCode == 201) {
       await res.stream.drain();
       if (type == BlobType.AppendBlob && (body != null || bodyBytes != null)) {
-        await appendBlock(fileName, body: body, bodyBytes: bodyBytes);
+        await appendBlock(fileName, body: body, bodyBytes: bodyBytes, headers: appendHeaders);
       }
       return;
     }
@@ -95,11 +96,51 @@ class AzureStorage {
     throw AzureStorageException(message, res.statusCode, res.headers);
   }
 
+  /// 
+  /// GetBlobMeta
+  ///
+  /// `body` and `bodyBytes` are exclusive and mandatory.
+  Future<Map<String, String>> getBlobMetaData(String fileName,
+      { Map<String, String>? headers}) async {
+    var request = http.Request('HEAD', _uri(fileName: fileName));
+    
+    if (headers != null) {
+      headers.forEach((key, value) {
+        request.headers['x-ms-meta-$key'] = value;
+      });
+    }
+    // if (contentType != null) request.headers['content-type'] = contentType;
+    
+    // if (type == BlobType.BlockBlob) {
+    //   if (bodyBytes != null) {
+    //     request.bodyBytes = bodyBytes;
+    //   } else if (body != null) {
+    //     request.body = body;
+    //   }
+    // } else {
+    //   request.body = '';
+    // }
+    var res = await request.send();
+    if (res.statusCode == 200) {
+      return res.headers;
+    }
+
+    var message = await res.stream.bytesToString();
+    throw AzureStorageException(message, res.statusCode, res.headers);
+  }
+
   /// Append block to blob.
   Future<void> appendBlock(String fileName,
-      {String? body, Uint8List? bodyBytes}) async {
+      {String? body,
+        Uint8List? bodyBytes,
+        Map<String, String>? headers}) async {
     var request = http.Request(
         'PUT', _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}));
+    if (headers != null) {
+      headers.forEach((key, value) {
+        request.headers['$key'] = value;
+      });
+    }
     if (bodyBytes != null) {
       request.bodyBytes = bodyBytes;
     } else if (body != null) {
