@@ -1,8 +1,10 @@
 library azure_upload_file;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:azure_upload_file/src/azure_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:async/async.dart';
@@ -13,8 +15,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 export 'src/azure_storage.dart';
 
 class AzureUploadFile {
-  late BehaviorSubject<double> _progress;
-  late CancelableOperation _uploadProcessToken;
   late SharedPreferences _prefs;
   AzureStorage? _azureStorage;
   late int _chunkSize;
@@ -46,21 +46,19 @@ class AzureUploadFile {
     }
   }
 
-  Stream<double> uploadFile(XFile file, {String fileNameWithoutExt = 'video'}) {
+  Stream<double> uploadFile(XFile file, {String fileNameWithoutExt = 'video', bool resume = false}) {
     if(!_initialized) {
       throw Exception("You have to call first config()");
     }
-    _isInPause = false;
-    _progress = BehaviorSubject<double>();
-    _uploadProcessToken =  CancelableOperation.fromFuture(_uploadFileInternal(file, fileNameWithoutExt: fileNameWithoutExt));
-    return _progress;
+
+    var outStream = DeferStream(()=> _uploadStream(file, fileNameWithoutExt: fileNameWithoutExt, resume: resume));
+    return outStream.publish().refCount();
   }
 
   Stream<double> resumeUploadFile() {
     if(!_initialized) {
       throw Exception("You have to call first config()");
     }
-    _progress = BehaviorSubject<double>();
     var filePath = _prefs.getString(_filePathKey);
     var fileNameWithoutExt = _prefs.getString(_fileNameWithoutExtKey);
     var sasLink = _prefs.getString(_sasLinkKey);
@@ -71,15 +69,11 @@ class AzureUploadFile {
       initWithSasLink(sasLink);
     }
     var file = XFile(filePath);
-    _uploadProcessToken =  CancelableOperation.fromFuture(_uploadFileInternal(file, fileNameWithoutExt: fileNameWithoutExt, resume: true));
-    return _progress;
+
+    
+    return uploadFile(file, fileNameWithoutExt: fileNameWithoutExt, resume: true );
   }
 
-  Future<void> _onCancelUpload() async {
-    if(!_isInPause) {
-      await _deletePrefs();
-    }
-  }
 
   Future<void> _deletePrefs() async {
     await _prefs.remove(_filePathKey);
@@ -87,16 +81,6 @@ class AzureUploadFile {
     await _prefs.remove(_sasLinkKey);
   }
 
-  Future<void> stopUpload() async {
-    _isInPause = false;
-    await _uploadProcessToken.cancel();
-  }
-
-  bool _isInPause = false;
-  Future<void> pauseUpload() async {
-    _isInPause = true;
-    await _uploadProcessToken.cancel();
-  }
 
   bool isPresentUploadToResume() {
     if(!_initialized) {
@@ -118,7 +102,7 @@ class AzureUploadFile {
   }
 
 
-  Future<void> _uploadFileInternal(XFile file, { String fileNameWithoutExt = 'video', bool resume = false }) async {
+  Stream<double> _uploadStream(XFile file, { String fileNameWithoutExt = 'video', bool resume = false }) async* {
     String fileName = "$fileNameWithoutExt.${file.path.split('.').last}";
     int end = await file.length();
     var offsetPos = 0;
@@ -131,9 +115,12 @@ class AzureUploadFile {
 
     var fileReader = ChunkedStreamReader(file.openRead(offsetPos));
     try {
-      _progress.add(offsetPos / end);
+      //Lo yield, funge anche da cancel, nel caso di "NESSUN" sottoscrittore
+      yield(offsetPos / end);
+      
       var nextBytes = await fileReader.readBytes(_chunkSize);
-      while(nextBytes.isNotEmpty && !_uploadProcessToken.isCanceled) {
+      while(nextBytes.isNotEmpty) {
+         
         var headers = {_offsetHeaderKey : offsetPos.toString() };
         var digestBlock = md5.convert(nextBytes);
         var md5Checksum = base64.encode(digestBlock.bytes);
@@ -146,24 +133,25 @@ class AzureUploadFile {
         offsetPos += nextBytes.length;
 
         if(nextBytes.length < _chunkSize) {
-          _progress.add(1.0);
+          yield(1.0);
         } else {
-          _progress.add(offsetPos / end);
+          yield(offsetPos / end);
         }
 
         nextBytes = await fileReader.readBytes(_chunkSize);
       }
-      if(!_uploadProcessToken.isCanceled) {
-        _progress.close();
-        _deletePrefs();
-      } else {
-        await _onCancelUpload();
+      
+
+      _deletePrefs();
+      if (kDebugMode) {
+        print('AzureUploadFile: completed');
       }
-    } catch(e) {
-      _progress.addError(e);
     }
     finally {
       fileReader.cancel();
+      if (kDebugMode) {
+        print('AzureUploadFile: exited');
+      }
     }
   }
 }

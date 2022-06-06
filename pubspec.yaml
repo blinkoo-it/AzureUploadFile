@@ -1,6 +1,6 @@
 name: azure_upload_file
 description: A Flutter package to upload file on azure with sas link.
-version: 1.2.0
+version: 1.3.0
 homepage:
 
 environment:
