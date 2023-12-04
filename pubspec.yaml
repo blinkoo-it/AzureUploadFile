@@ -1,7 +1,7 @@
 name: azure_upload_file
 description: A Flutter package to upload file on azure with sas link.
-version: 1.3.1
-homepage:
+version: 1.3.2
+homepage: "flutter"
 
 environment:
   sdk: ">=2.16.1 <3.0.0"
@@ -11,19 +11,19 @@ dependencies:
   flutter:
     sdk: flutter
 
-  chunked_stream: ^1.4.1
-  async: ^2.8.2
-  rxdart: ^0.27.3
-  shared_preferences: ^2.0.5
+  async: ^2.11.0
+  chunked_stream: ^1.4.2
+  cross_file: ^0.3.3+8
+  crypto: ^3.0.3
+  http: ^1.1.2
   mime_type: ^1.0.0
-  cross_file: ^0.3.2
-  http: ^0.13.4
-  crypto: ^3.0.1
+  rxdart: ^0.27.7
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^1.0.0
+  flutter_lints: ^1.0.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

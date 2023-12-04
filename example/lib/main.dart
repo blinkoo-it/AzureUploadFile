@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:azure_upload_file/azure_upload_file.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -73,8 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
     azureStorage = AzureUploadFile();
     await azureStorage.config();
     azureStorage.initWithSasLink(
-        'https://amsstoragestage.blob.core.windows.net/temp-828f51c9-25a1-4198-81fa-ab302fae254d?sv=2020-08-04&se=2022-05-30T22%3A32%3A15Z&sr=c&sp=rw&sig=HVUJQc%2Fl2LRIQmcpPwW%2BWa2dwDMKCWH%2BduRK%2F9W4PSI%3D'
-        );
+        'https://amsstoragestage.blob.core.windows.net/temp-828f51c9-25a1-4198-81fa-ab302fae254d?sv=2020-08-04&se=2022-05-30T22%3A32%3A15Z&sr=c&sp=rw&sig=HVUJQc%2Fl2LRIQmcpPwW%2BWa2dwDMKCWH%2BduRK%2F9W4PSI%3D');
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     streamSubscription = azureStorage.uploadFile(video).listen((event) {
       _counter = event * 100;
