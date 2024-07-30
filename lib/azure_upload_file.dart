@@ -19,6 +19,7 @@ class AzureUploadFile {
   late int _chunkSize;
 
   bool _initialized = false;
+  bool _isPaused = true;
 
   static const String _filePathKey = 'filePath';
   static const String _fileNameWithoutExtKey = 'fileNameWithoutExt';
@@ -85,6 +86,10 @@ class AzureUploadFile {
     );
   }
 
+  void pauseUploadFile() {
+    _isPaused = true;
+  }
+
   Future<void> _deletePrefs() async {
     await _prefs.remove(_filePathKey);
     await _prefs.remove(_fileNameWithoutExtKey);
@@ -129,15 +134,14 @@ class AzureUploadFile {
 
     final ChunkedStreamReader<int> fileReader =
         ChunkedStreamReader(file.openRead(offsetPos));
+    Uint8List? nextBytes;
+    _isPaused = false;
     try {
-      bool firstCall = true;
-      Uint8List nextBytes = await fileReader.readBytes(_chunkSize);
+      nextBytes = await fileReader.readBytes(_chunkSize);
       // when there are no listeners, we pause uploading.
       // with firstCall we can resume correctly after a pause since
       // there are no listeners yet
-      final bool listenersAvailable = _azureStorage!.hasListeners || firstCall;
-
-      while (nextBytes.isNotEmpty && listenersAvailable) {
+      while (nextBytes!.isNotEmpty && !_isPaused) {
         final Map<String, String> headers = {
           _offsetHeaderKey: offsetPos.toString()
         };
@@ -164,17 +168,19 @@ class AzureUploadFile {
           );
         }
         offsetPos += nextBytes.length;
-        firstCall = false;
 
         nextBytes = await fileReader.readBytes(_chunkSize);
       }
-      if (_azureStorage!.hasListeners) {
+      if (nextBytes.isEmpty == true) {
         _deletePrefs();
         debugPrint('AzureUploadFile: completed');
       }
     } finally {
       fileReader.cancel();
-      _azureStorage!.closeStream();
+      if (nextBytes?.isEmpty == true) {
+        _azureStorage!.closeStream();
+        _isPaused = true;
+      }
       debugPrint('AzureUploadFile: exited');
     }
   }

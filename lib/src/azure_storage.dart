@@ -36,7 +36,6 @@ class AzureStorage {
 
   void closeStream() {
     _progressSubj.close();
-    _progressSubj = BehaviorSubject.seeded(_progressValue);
   }
 
   Stream<double> get progressStream => _progressSubj.stream
@@ -48,8 +47,6 @@ class AzureStorage {
       )
       .map((val) => double.parse(val.toStringAsFixed(2)))
       .distinct();
-
-  bool get hasListeners => _progressSubj.hasListener;
 
   void _updateProgressSubj(int part, int count) {
     _progressValue = {..._progressSubj.value, part: count};

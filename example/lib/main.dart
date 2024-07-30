@@ -58,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final ImagePicker _picker = ImagePicker();
   late AzureUploadFile azureStorage;
-  late StreamSubscription<double>? streamSubscription;
+  StreamSubscription<double>? streamSubscription;
 
   void _addFile() async {
     streamSubscription?.cancel();
@@ -88,11 +88,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void resumeUpload() async {
+    streamSubscription?.cancel();
     streamSubscription = azureStorage.resumeUploadFile().listen((event) {
       setState(() {
         _counter = (event * 100).toInt().toString();
       });
-      debugPrint("Your upload progress: ${event * 100}%");
+      // debugPrint("Your upload progress: ${event * 100}%");
     }, onError: (e) {
       debugPrint(e.toString());
     }, onDone: () {
@@ -101,8 +102,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void cancelVideo() async {
-    streamSubscription?.cancel();
-    streamSubscription = null;
+    azureStorage.pauseUploadFile();
   }
 
   @override
