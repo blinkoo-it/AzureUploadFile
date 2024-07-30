@@ -109,38 +109,6 @@ class AzureStorage {
       response.statusCode ?? 0,
       response.headers.map,
     );
-
-    // var request = http.Request('PUT', _uri(fileName: fileName));
-    // request.headers['x-ms-blob-type'] =
-    //     type == BlobType.appendBlob ? 'AppendBlob' : 'BlockBlob';
-    // request.headers['x-ms-blob-content-disposition'] = 'inline';
-    // if (headers != null) {
-    //   headers.forEach((key, value) {
-    //     request.headers['x-ms-meta-$key'] = value;
-    //   });
-    // }
-    // if (contentType != null) request.headers['content-type'] = contentType;
-    // if (type == BlobType.blockBlob) {
-    //   if (bodyBytes != null) {
-    //     request.bodyBytes = bodyBytes;
-    //   } else if (body != null) {
-    //     request.body = body;
-    //   }
-    // } else {
-    //   request.body = '';
-    // }
-    // var res = await request.send();
-    // if (res.statusCode == 201) {
-    //   await res.stream.drain();
-    //   if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
-    //     await appendBlock(fileName,
-    //         body: body, bodyBytes: bodyBytes, headers: appendHeaders);
-    //   }
-    //   return;
-    // }
-
-    // var message = await res.stream.bytesToString();
-    // throw AzureStorageException(message, res.statusCode, res.headers);
   }
 
   ///
@@ -175,32 +143,6 @@ class AzureStorage {
       response.statusCode ?? 0,
       response.headers.map,
     );
-
-    // var request = http.Request('HEAD', _uri(fileName: fileName));
-
-    // if (headers != null) {
-    //   headers.forEach((key, value) {
-    //     request.headers['x-ms-meta-$key'] = value;
-    //   });
-    // }
-    // // if (contentType != null) request.headers['content-type'] = contentType;
-
-    // // if (type == BlobType.BlockBlob) {
-    // //   if (bodyBytes != null) {
-    // //     request.bodyBytes = bodyBytes;
-    // //   } else if (body != null) {
-    // //     request.body = body;
-    // //   }
-    // // } else {
-    // //   request.body = '';
-    // // }
-    // var res = await request.send();
-    // if (res.statusCode == 200) {
-    //   return res.headers;
-    // }
-
-    // var message = await res.stream.bytesToString();
-    // throw AzureStorageException(message, res.statusCode, res.headers);
   }
 
   /// Append block to blob.
@@ -230,26 +172,5 @@ class AzureStorage {
       response.statusCode ?? 0,
       response.headers.map,
     );
-
-    // var request = http.Request('PUT',
-    //     _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}));
-    // if (headers != null) {
-    //   headers.forEach((key, value) {
-    //     request.headers['$key'] = value;
-    //   });
-    // }
-    // if (bodyBytes != null) {
-    //   request.bodyBytes = bodyBytes;
-    // } else if (body != null) {
-    //   request.body = body;
-    // }
-    // var res = await request.send();
-    // if (res.statusCode == 201) {
-    //   await res.stream.drain();
-    //   return;
-    // }
-
-    // var message = await res.stream.bytesToString();
-    // throw AzureStorageException(message, res.statusCode, res.headers);
   }
 }

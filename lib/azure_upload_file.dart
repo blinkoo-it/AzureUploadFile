@@ -3,11 +3,11 @@ library azure_upload_file;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:async/async.dart';
 import 'package:azure_upload_file/src/azure_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime/mime.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:async/async.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
