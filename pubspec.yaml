@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
 
   async: ^2.11.0
-  chunked_stream: ^1.4.2
   cross_file: ^0.3.4+1
   crypto: ^3.0.3
   dio: ^5.4.1
