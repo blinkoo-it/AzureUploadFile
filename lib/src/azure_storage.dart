@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:azure_upload_file/src/azure_storage_exception.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Blob type
 enum BlobType {
@@ -12,7 +13,10 @@ enum BlobType {
 
 class AzureStorage {
   late Map<String, String> _config;
+  Map<int, int> _progressValue = {};
   final Dio _dio = Dio();
+  late BehaviorSubject<Map<int, int>> _progressSubj;
+  late int _fileSize;
 
   static const String queryPathKey = 'QueryPath';
   static const String queryParamsKey = 'QueryParams';
@@ -24,9 +28,32 @@ class AzureStorage {
       m[queryPathKey] = urlSplitted[0];
       m[queryParamsKey] = urlSplitted[1];
       _config = m;
+      _progressSubj = BehaviorSubject.seeded(_progressValue);
     } catch (e) {
       throw Exception('Parse error.');
     }
+  }
+
+  void closeStream() {
+    _progressSubj.close();
+    _progressSubj = BehaviorSubject.seeded(_progressValue);
+  }
+
+  Stream<double> get progressStream => _progressSubj.stream
+      .share()
+      .map<double>(
+        (progressMap) => (progressMap.values.isEmpty
+            ? 0
+            : progressMap.values.reduce((a, b) => a + b) / _fileSize),
+      )
+      .map((val) => double.parse(val.toStringAsFixed(2)))
+      .distinct();
+
+  bool get hasListeners => _progressSubj.hasListener;
+
+  void _updateProgressSubj(int part, int count) {
+    _progressValue = {..._progressSubj.value, part: count};
+    _progressSubj.add(_progressValue);
   }
 
   @override
@@ -62,7 +89,9 @@ class AzureStorage {
     BlobType type = BlobType.blockBlob,
     Map<String, String>? headers,
     Map<String, String>? appendHeaders,
+    required int fileSize,
   }) async {
+    _fileSize = fileSize;
     final Map<String, dynamic> requestHeaders = {
       'x-ms-blob-type':
           type == BlobType.appendBlob ? 'AppendBlob' : 'BlockBlob',
@@ -90,14 +119,17 @@ class AzureStorage {
         contentType: contentType,
         headers: requestHeaders,
       ),
+      onSendProgress: (count, total) => _updateProgressSubj(0, count),
     );
     if (response.statusCode == 201) {
       if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
         await appendBlock(
           fileName,
+          part: 0,
           body: body,
           bodyBytes: bodyBytes,
           headers: appendHeaders,
+          fileSize: _fileSize,
         );
       }
       return;
@@ -148,11 +180,17 @@ class AzureStorage {
   /// Append block to blob.
   Future<void> appendBlock(
     String fileName, {
+    required int part,
     String? body,
     Uint8List? bodyBytes,
     Map<String, String>? headers,
     String? contentType,
+    required int fileSize,
   }) async {
+    _fileSize = fileSize;
+    debugPrint("Filesize: $fileSize");
+    debugPrint("part: $part");
+
     dynamic requestBody = bodyBytes ?? body;
 
     final Response<String> response = await _dio.putUri(
@@ -162,6 +200,7 @@ class AzureStorage {
         contentType: contentType,
         headers: headers,
       ),
+      onSendProgress: (count, total) => _updateProgressSubj(part, count),
     );
 
     if (response.statusCode == 201) return;

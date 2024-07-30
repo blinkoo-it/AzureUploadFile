@@ -7,7 +7,6 @@ import 'package:async/async.dart';
 import 'package:azure_upload_file/src/azure_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime/mime.dart';
-import 'package:rxdart/rxdart.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,12 +53,13 @@ class AzureUploadFile {
     if (!_initialized) {
       throw Exception("You have to call first config()");
     }
-
-    var outStream = DeferStream(
-      () => _uploadStream(file,
-          fileNameWithoutExt: fileNameWithoutExt, resume: resume),
+    _uploadStream(
+      file,
+      fileNameWithoutExt: fileNameWithoutExt,
+      resume: resume,
     );
-    return outStream.publish().refCount();
+
+    return _azureStorage!.progressStream;
   }
 
   Stream<double> resumeUploadFile() {
@@ -110,15 +110,16 @@ class AzureUploadFile {
     return int.tryParse(res['content-length'] ?? '0') ?? 0;
   }
 
-  Stream<double> _uploadStream(
+  Future<void> _uploadStream(
     XFile file, {
     String fileNameWithoutExt = 'video',
     bool resume = false,
-  }) async* {
+  }) async {
     final String fileName = "$fileNameWithoutExt.${file.path.split('.').last}";
     final int end = await file.length();
     final String? contentType = lookupMimeType(file.path);
     int offsetPos = 0;
+
     if (resume) {
       offsetPos = await _getVideoContentLength(fileName);
     }
@@ -129,11 +130,14 @@ class AzureUploadFile {
     final ChunkedStreamReader<int> fileReader =
         ChunkedStreamReader(file.openRead(offsetPos));
     try {
-      //Lo yield, funge anche da cancel, nel caso di "NESSUN" sottoscrittore
-      yield (offsetPos / end);
-
+      bool firstCall = true;
       Uint8List nextBytes = await fileReader.readBytes(_chunkSize);
-      while (nextBytes.isNotEmpty) {
+      // when there are no listeners, we pause uploading.
+      // with firstCall we can resume correctly after a pause since
+      // there are no listeners yet
+      final bool listenersAvailable = _azureStorage!.hasListeners || firstCall;
+
+      while (nextBytes.isNotEmpty && listenersAvailable) {
         final Map<String, String> headers = {
           _offsetHeaderKey: offsetPos.toString()
         };
@@ -147,35 +151,31 @@ class AzureUploadFile {
             contentType: contentType,
             type: BlobType.appendBlob,
             appendHeaders: headers,
+            fileSize: end,
           );
         } else {
           await _azureStorage!.appendBlock(
             fileName,
+            part: offsetPos ~/ _chunkSize,
             bodyBytes: nextBytes,
             headers: headers,
             contentType: contentType,
+            fileSize: end,
           );
         }
         offsetPos += nextBytes.length;
-
-        if (nextBytes.length < _chunkSize) {
-          yield (1.0);
-        } else {
-          yield (offsetPos / end);
-        }
+        firstCall = false;
 
         nextBytes = await fileReader.readBytes(_chunkSize);
       }
-
-      _deletePrefs();
-      if (kDebugMode) {
-        print('AzureUploadFile: completed');
+      if (_azureStorage!.hasListeners) {
+        _deletePrefs();
+        debugPrint('AzureUploadFile: completed');
       }
     } finally {
       fileReader.cancel();
-      if (kDebugMode) {
-        print('AzureUploadFile: exited');
-      }
+      _azureStorage!.closeStream();
+      debugPrint('AzureUploadFile: exited');
     }
   }
 }
