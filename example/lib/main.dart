@@ -62,7 +62,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _incrementCounter() async {
     final XFile? video = await _picker.pickVideo(
-        source: ImageSource.gallery, maxDuration: const Duration(minutes: 2));
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 2),
+    );
     print(video!.path);
 
     await Hive.initFlutter();
@@ -72,7 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
     azureStorage = AzureUploadFile();
     await azureStorage.config();
     azureStorage.initWithSasLink(
-        'https://amsstoragestage.blob.core.windows.net/temp-828f51c9-25a1-4198-81fa-ab302fae254d?sv=2020-08-04&se=2022-05-30T22%3A32%3A15Z&sr=c&sp=rw&sig=HVUJQc%2Fl2LRIQmcpPwW%2BWa2dwDMKCWH%2BduRK%2F9W4PSI%3D');
+        "https://amsstoragestage.blob.core.windows.net/temp-0b46bef9-65e9-4730-af87-3eff0bf71eb0?sv=2022-11-02&se=2024-07-30T21%3A32%3A18Z&sr=c&sp=rw&sig=ogYgdnC27eIkZIl8S%2B5TFrzjJTpa1%2BhRbuTOyI81R%2Fw%3D");
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     streamSubscription = azureStorage.uploadFile(video).listen((event) {
       _counter = event * 100;
