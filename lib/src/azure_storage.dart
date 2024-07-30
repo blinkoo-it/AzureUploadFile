@@ -1,34 +1,28 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 
-/// Azure Storage Exception
-class AzureStorageException implements Exception {
-  final String message;
-  final int statusCode;
-  final Map<String, String> headers;
-  AzureStorageException(this.message, this.statusCode, this.headers);
-}
+import 'package:azure_upload_file/src/azure_storage_exception.dart';
+import 'package:dio/dio.dart';
 
 /// Blob type
 enum BlobType {
-  BlockBlob,
-  AppendBlob,
+  blockBlob,
+  appendBlob,
 }
 
 class AzureStorage {
-
   late Map<String, String> _config;
+  final Dio _dio = Dio();
 
-  static const String QueryPath = 'QueryPath';
-  static const String QueryParams = 'QueryParams';
+  static const String queryPathKey = 'QueryPath';
+  static const String queryParamsKey = 'QueryParams';
 
   AzureStorage.parseSasLink(String sasLink) {
     try {
-      var m = <String, String>{};
-      var urlSplitted = sasLink.split('?');
-      m[QueryPath] = urlSplitted[0];
-      m[QueryParams] = urlSplitted[1];
+      final Map<String, String> m = {};
+      final List<String> urlSplitted = sasLink.split('?');
+      m[queryPathKey] = urlSplitted[0];
+      m[queryParamsKey] = urlSplitted[1];
       _config = m;
     } catch (e) {
       throw Exception('Parse error.');
@@ -40,13 +34,16 @@ class AzureStorage {
     return _config.toString();
   }
 
-  Uri _uri({String fileName = '/', Map<String, String>? queryParameters}) {
-    var queryPath = _config[QueryPath];
-    var queryParams = _config[QueryParams];
-    var url = '$queryPath/$fileName?$queryParams';
+  Uri _uri({
+    String fileName = '/',
+    Map<String, String>? queryParameters,
+  }) {
+    final String? queryPath = _config[queryPathKey];
+    final String? queryParams = _config[queryParamsKey];
+    String url = '$queryPath/$fileName?$queryParams';
 
-    if(queryParameters != null) {
-      List<String> list = List.empty(growable: true);
+    if (queryParameters != null) {
+      final List<String> list = List.empty(growable: true);
       queryParameters.forEach((k, v) => list.add('$k=$v'));
       url = '$url&${list.join('&')}';
     }
@@ -57,61 +54,73 @@ class AzureStorage {
   /// Put Blob.
   ///
   /// `body` and `bodyBytes` are exclusive and mandatory.
-  Future<void> putBlob(String fileName,
-      {String? body,
-        Uint8List? bodyBytes,
-        String? contentType,
-        BlobType type = BlobType.BlockBlob,
-        Map<String, String>? headers,
-        Map<String, String>? appendHeaders}) async {
-    var request = http.Request('PUT', _uri(fileName: fileName));
-    request.headers['x-ms-blob-type'] =
-    type.toString() == 'BlobType.AppendBlob' ? 'AppendBlob' : 'BlockBlob';
-    request.headers['x-ms-blob-content-disposition'] = 'inline';
-    if (headers != null) {
-      headers.forEach((key, value) {
-        request.headers['x-ms-meta-$key'] = value;
-      });
-    }
-    if (contentType != null) request.headers['content-type'] = contentType;
-    if (type == BlobType.BlockBlob) {
+  Future<void> putBlob(
+    String fileName, {
+    String? body,
+    Uint8List? bodyBytes,
+    String? contentType,
+    BlobType type = BlobType.blockBlob,
+    Map<String, String>? headers,
+    Map<String, String>? appendHeaders,
+  }) async {
+    final Map<String, dynamic> requestHeaders = {
+      'x-ms-blob-type':
+          type == BlobType.appendBlob ? 'AppendBlob' : 'BlockBlob',
+      'x-ms-blob-content-disposition': 'inline',
+    };
+    headers?.forEach((key, value) {
+      requestHeaders['x-ms-meta-$key'] = value;
+    });
+
+    dynamic requestBody;
+    if (type == BlobType.blockBlob) {
       if (bodyBytes != null) {
-        request.bodyBytes = bodyBytes;
+        requestBody = bodyBytes;
       } else if (body != null) {
-        request.body = body;
+        requestBody = body;
       }
     } else {
-      request.body = '';
+      requestBody = '';
     }
-    var res = await request.send();
-    if (res.statusCode == 201) {
-      await res.stream.drain();
-      if (type == BlobType.AppendBlob && (body != null || bodyBytes != null)) {
-        await appendBlock(fileName, body: body, bodyBytes: bodyBytes, headers: appendHeaders);
+
+    final Response<String> response = await _dio.putUri(
+      _uri(fileName: fileName),
+      data: requestBody,
+      options: Options(
+        contentType: contentType,
+        headers: requestHeaders,
+      ),
+    );
+    if (response.statusCode == 201) {
+      if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
+        await appendBlock(
+          fileName,
+          body: body,
+          bodyBytes: bodyBytes,
+          headers: appendHeaders,
+        );
       }
       return;
     }
 
-    var message = await res.stream.bytesToString();
-    throw AzureStorageException(message, res.statusCode, res.headers);
-  }
+    final String message = response.data ?? '';
+    throw AzureStorageException(
+      message,
+      response.statusCode ?? 0,
+      response.headers.map,
+    );
 
-  /// 
-  /// GetBlobMeta
-  ///
-  /// `body` and `bodyBytes` are exclusive and mandatory.
-  Future<Map<String, String>> getBlobMetaData(String fileName,
-      { Map<String, String>? headers}) async {
-    var request = http.Request('HEAD', _uri(fileName: fileName));
-    
-    if (headers != null) {
-      headers.forEach((key, value) {
-        request.headers['x-ms-meta-$key'] = value;
-      });
-    }
+    // var request = http.Request('PUT', _uri(fileName: fileName));
+    // request.headers['x-ms-blob-type'] =
+    //     type == BlobType.appendBlob ? 'AppendBlob' : 'BlockBlob';
+    // request.headers['x-ms-blob-content-disposition'] = 'inline';
+    // if (headers != null) {
+    //   headers.forEach((key, value) {
+    //     request.headers['x-ms-meta-$key'] = value;
+    //   });
+    // }
     // if (contentType != null) request.headers['content-type'] = contentType;
-    
-    // if (type == BlobType.BlockBlob) {
+    // if (type == BlobType.blockBlob) {
     //   if (bodyBytes != null) {
     //     request.bodyBytes = bodyBytes;
     //   } else if (body != null) {
@@ -120,39 +129,127 @@ class AzureStorage {
     // } else {
     //   request.body = '';
     // }
-    var res = await request.send();
-    if (res.statusCode == 200) {
-      return res.headers;
+    // var res = await request.send();
+    // if (res.statusCode == 201) {
+    //   await res.stream.drain();
+    //   if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
+    //     await appendBlock(fileName,
+    //         body: body, bodyBytes: bodyBytes, headers: appendHeaders);
+    //   }
+    //   return;
+    // }
+
+    // var message = await res.stream.bytesToString();
+    // throw AzureStorageException(message, res.statusCode, res.headers);
+  }
+
+  ///
+  /// GetBlobMeta
+  ///
+  /// `body` and `bodyBytes` are exclusive and mandatory.
+  Future<Map<String, String>> getBlobMetaData(
+    String fileName, {
+    Map<String, String>? headers,
+  }) async {
+    final Map<String, dynamic> requestHeaders = {};
+    headers?.forEach((key, value) {
+      requestHeaders['x-ms-meta-$key'] = value;
+    });
+
+    final Response<String> response = await _dio.headUri(
+      _uri(fileName: fileName),
+      options: Options(
+        contentType: "plain/text",
+        headers: headers,
+      ),
+    );
+    if (response.statusCode == 200) {
+      return response.headers.map.map(
+        (key, value) => MapEntry(key, value.join(',')),
+      );
     }
 
-    var message = await res.stream.bytesToString();
-    throw AzureStorageException(message, res.statusCode, res.headers);
+    final String message = response.data ?? '';
+    throw AzureStorageException(
+      message,
+      response.statusCode ?? 0,
+      response.headers.map,
+    );
+
+    // var request = http.Request('HEAD', _uri(fileName: fileName));
+
+    // if (headers != null) {
+    //   headers.forEach((key, value) {
+    //     request.headers['x-ms-meta-$key'] = value;
+    //   });
+    // }
+    // // if (contentType != null) request.headers['content-type'] = contentType;
+
+    // // if (type == BlobType.BlockBlob) {
+    // //   if (bodyBytes != null) {
+    // //     request.bodyBytes = bodyBytes;
+    // //   } else if (body != null) {
+    // //     request.body = body;
+    // //   }
+    // // } else {
+    // //   request.body = '';
+    // // }
+    // var res = await request.send();
+    // if (res.statusCode == 200) {
+    //   return res.headers;
+    // }
+
+    // var message = await res.stream.bytesToString();
+    // throw AzureStorageException(message, res.statusCode, res.headers);
   }
 
   /// Append block to blob.
-  Future<void> appendBlock(String fileName,
-      {String? body,
-        Uint8List? bodyBytes,
-        Map<String, String>? headers}) async {
-    var request = http.Request(
-        'PUT', _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}));
-    if (headers != null) {
-      headers.forEach((key, value) {
-        request.headers['$key'] = value;
-      });
-    }
-    if (bodyBytes != null) {
-      request.bodyBytes = bodyBytes;
-    } else if (body != null) {
-      request.body = body;
-    }
-    var res = await request.send();
-    if (res.statusCode == 201) {
-      await res.stream.drain();
-      return;
-    }
+  Future<void> appendBlock(
+    String fileName, {
+    String? body,
+    Uint8List? bodyBytes,
+    Map<String, String>? headers,
+    String? contentType,
+  }) async {
+    dynamic requestBody = bodyBytes ?? body;
 
-    var message = await res.stream.bytesToString();
-    throw AzureStorageException(message, res.statusCode, res.headers);
+    final Response<String> response = await _dio.putUri(
+      _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}),
+      data: requestBody,
+      options: Options(
+        contentType: contentType,
+        headers: headers,
+      ),
+    );
+
+    if (response.statusCode == 201) return;
+
+    final String message = response.data ?? '';
+    throw AzureStorageException(
+      message,
+      response.statusCode ?? 0,
+      response.headers.map,
+    );
+
+    // var request = http.Request('PUT',
+    //     _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}));
+    // if (headers != null) {
+    //   headers.forEach((key, value) {
+    //     request.headers['$key'] = value;
+    //   });
+    // }
+    // if (bodyBytes != null) {
+    //   request.bodyBytes = bodyBytes;
+    // } else if (body != null) {
+    //   request.body = body;
+    // }
+    // var res = await request.send();
+    // if (res.statusCode == 201) {
+    //   await res.stream.drain();
+    //   return;
+    // }
+
+    // var message = await res.stream.bytesToString();
+    // throw AzureStorageException(message, res.statusCode, res.headers);
   }
 }
