@@ -53,64 +53,56 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  double _counter = 0;
+  String _counter = "0";
   String? pathImage;
 
   final ImagePicker _picker = ImagePicker();
   late AzureUploadFile azureStorage;
-  StreamSubscription<double>? streamSubscription = null;
+  late StreamSubscription<double>? streamSubscription;
 
-  void _incrementCounter() async {
+  void _addFile() async {
+    streamSubscription?.cancel();
     final XFile? video = await _picker.pickVideo(
       source: ImageSource.gallery,
       maxDuration: const Duration(minutes: 2),
     );
-    print(video!.path);
-
+    debugPrint(video!.path);
     await Hive.initFlutter();
-
-    streamSubscription?.cancel();
 
     azureStorage = AzureUploadFile();
     await azureStorage.config();
     azureStorage.initWithSasLink(
-        "https://amsstoragestage.blob.core.windows.net/temp-0b46bef9-65e9-4730-af87-3eff0bf71eb0?sv=2022-11-02&se=2024-07-30T21%3A32%3A18Z&sr=c&sp=rw&sig=ogYgdnC27eIkZIl8S%2B5TFrzjJTpa1%2BhRbuTOyI81R%2Fw%3D");
+        "https://amsstoragestage.blob.core.windows.net/temp-b90a09d7-8ff4-4484-91d0-2a6871411850?sv=2022-11-02&se=2024-07-31T02%3A21%3A50Z&sr=c&sp=rw&sig=VU7K8DDIG5gmybwN624yQbBXAWf9CIPSm020JDZZ9x0%3D");
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     streamSubscription = azureStorage.uploadFile(video).listen((event) {
-      _counter = event * 100;
-      print("Your upload progress: ${event * 100}%");
+      setState(() {
+        _counter = (event * 100).toInt().toString();
+      });
+      debugPrint("Your upload progress: $_counter%");
     }, onError: (e, st) {
-      print(e);
-      print(st);
+      debugPrint(e);
+      debugPrint(st);
     }, onDone: () {
-      print("Completed");
+      debugPrint("Completed");
     }, cancelOnError: true);
   }
 
-  void pickVideo() async {
-    if (azureStorage != null) {
-      streamSubscription = azureStorage.resumeUploadFile().listen((event) {
-        _counter = event * 100;
-        print("Your upload progress: ${event * 100}%");
-      }, onError: (e) {
-        print(e.toString());
-      }, onDone: () {
-        print("Completed");
-      }, cancelOnError: true);
-    }
+  void resumeUpload() async {
+    streamSubscription = azureStorage.resumeUploadFile().listen((event) {
+      setState(() {
+        _counter = (event * 100).toInt().toString();
+      });
+      debugPrint("Your upload progress: ${event * 100}%");
+    }, onError: (e) {
+      debugPrint(e.toString());
+    }, onDone: () {
+      debugPrint("Completed");
+    }, cancelOnError: true);
   }
 
-  // void getVideoMeta() async {
-  //   if(azureStorage != null) {
-  //     await azureStorage.getVideoMeta();
-  //   }
-  // }
-
   void cancelVideo() async {
-    if (azureStorage != null) {
-      streamSubscription?.cancel();
-      streamSubscription = null;
-    }
+    streamSubscription?.cancel();
+    streamSubscription = null;
   }
 
   @override
@@ -149,10 +141,10 @@ class _MyHomePageState extends State<MyHomePage> {
           children: <Widget>[
             //Image.file(File(pathImage!)),
             Text(
-              'Your upload progress: ${_counter * 100}%',
+              'Your upload progress: $_counter%',
             ),
             TextButton(
-                onPressed: pickVideo,
+                onPressed: resumeUpload,
                 child: const Text(
                   'Resume',
                 )),
@@ -169,7 +161,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: _addFile,
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
