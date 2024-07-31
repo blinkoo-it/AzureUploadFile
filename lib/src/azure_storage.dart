@@ -126,6 +126,7 @@ class AzureStorage {
           body: body,
           bodyBytes: bodyBytes,
           headers: appendHeaders,
+          contentType: contentType,
           fileSize: _fileSize,
         );
       }
