@@ -1,6 +1,7 @@
 import "dart:async";
 import "dart:io";
 
+import "package:azure_upload_file/azure_upload_file.dart";
 import "package:azure_upload_file/src/azure_storage_exception.dart";
 import "package:dio/dio.dart";
 import "package:flutter/foundation.dart";
@@ -14,7 +15,6 @@ enum BlobType {
 
 class AzureStorage {
   late Map<String, String> _config;
-  Map<int, int> _progressValue = {};
   final Dio _dio = Dio();
   late BehaviorSubject<Map<int, int>> _progressSubj;
   late int _fileSize;
@@ -22,35 +22,35 @@ class AzureStorage {
   static const String queryPathKey = "QueryPath";
   static const String queryParamsKey = "QueryParams";
 
-  AzureStorage.parseSasLink(String sasLink) {
+  int get fileSize => _fileSize;
+
+  AzureStorage.parseSasLink(
+    String sasLink, {
+    Map<int, int>? actualProgress,
+  }) {
     try {
       _config = {};
       final List<String> urlSplitted = sasLink.split("?");
       _config[queryPathKey] = urlSplitted[0];
       _config[queryParamsKey] = urlSplitted[1];
-      _progressSubj = BehaviorSubject.seeded(_progressValue);
+      initStream(actualProgress);
     } catch (e) {
       throw Exception("Parse error.");
     }
+  }
+
+  void initStream(Map<int, int>? actualProgress) {
+    _progressSubj = BehaviorSubject.seeded(actualProgress ?? const {});
   }
 
   void closeStream() {
     _progressSubj.close();
   }
 
-  Stream<double> get progressStream => _progressSubj.stream
-      .share()
-      .map<double>(
-        (progressMap) => (progressMap.values.isEmpty
-            ? 0
-            : progressMap.values.reduce((a, b) => a + b) / _fileSize),
-      )
-      .map((val) => double.parse(val.toStringAsFixed(2)))
-      .distinct();
+  Stream<Map<int, int>> get progressStream => _progressSubj.stream;
 
   void _updateProgressSubj(int part, int count) {
-    _progressValue = {..._progressSubj.value, part: count};
-    _progressSubj.add(_progressValue);
+    _progressSubj.add({..._progressSubj.value, part: count});
   }
 
   @override
@@ -96,57 +96,63 @@ class AzureStorage {
       !(body != null && bodyBytes != null),
       "'body' and 'bodyBytes' are exclusive",
     );
-    _fileSize = fileSize;
-    final Map<String, dynamic> requestHeaders = {
-      "x-ms-blob-type":
-          type == BlobType.appendBlob ? "AppendBlob" : "BlockBlob",
-      "x-ms-blob-content-disposition": "inline",
-    };
-    headers?.forEach((key, value) {
-      requestHeaders["x-ms-meta-$key"] = value;
-    });
+    try {
+      _fileSize = fileSize;
+      final Map<String, dynamic> requestHeaders = {
+        "x-ms-blob-type":
+            type == BlobType.appendBlob ? "AppendBlob" : "BlockBlob",
+        "x-ms-blob-content-disposition": "inline",
+      };
+      headers?.forEach((key, value) {
+        requestHeaders["x-ms-meta-$key"] = value;
+      });
 
-    dynamic requestBody;
-    if (type == BlobType.blockBlob) {
-      if (bodyBytes != null) {
-        requestBody = bodyBytes;
-      } else if (body != null) {
-        requestBody = body;
+      dynamic requestBody;
+      if (type == BlobType.blockBlob) {
+        if (bodyBytes != null) {
+          requestBody = bodyBytes;
+        } else if (body != null) {
+          requestBody = body;
+        }
+      } else {
+        requestBody = "";
       }
-    } else {
-      requestBody = "";
-    }
 
-    final Response<String> response = await _dio.putUri(
-      _uri(fileName: fileName),
-      data: requestBody,
-      options: Options(
-        contentType: contentType,
-        headers: requestHeaders,
-      ),
-      onSendProgress: (count, total) => _updateProgressSubj(0, count),
-    );
-    if (response.statusCode == HttpStatus.created) {
-      if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
-        await appendBlock(
-          fileName,
-          part: 0,
-          body: body,
-          bodyBytes: bodyBytes,
-          headers: appendHeaders,
+      final Response<String> response = await _dio.putUri(
+        _uri(fileName: fileName),
+        data: requestBody,
+        options: Options(
           contentType: contentType,
-          fileSize: _fileSize,
-        );
+          headers: requestHeaders,
+        ),
+        onSendProgress: (count, total) => _updateProgressSubj(0, count),
+      );
+      if (response.statusCode == HttpStatus.created) {
+        if (type == BlobType.appendBlob &&
+            (body != null || bodyBytes != null)) {
+          await appendBlock(
+            fileName,
+            part: 0,
+            body: body,
+            bodyBytes: bodyBytes,
+            headers: appendHeaders,
+            contentType: contentType,
+            fileSize: _fileSize,
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    final String message = response.data ?? "";
-    throw AzureStorageException(
-      message,
-      response.statusCode ?? 0,
-      response.headers.map,
-    );
+      final String message = response.data ?? "";
+      throw AzureStorageException(
+        message,
+        response.statusCode ?? 0,
+        response.headers.map,
+      );
+    } catch (e) {
+      _progressSubj.addError(e);
+      rethrow;
+    }
   }
 
   ///
@@ -156,30 +162,35 @@ class AzureStorage {
     String fileName, {
     Map<String, String>? headers,
   }) async {
-    final Map<String, dynamic> requestHeaders = {};
-    headers?.forEach((key, value) {
-      requestHeaders["x-ms-meta-$key"] = value;
-    });
+    try {
+      final Map<String, dynamic> requestHeaders = {};
+      headers?.forEach((key, value) {
+        requestHeaders["x-ms-meta-$key"] = value;
+      });
 
-    final Response<String> response = await _dio.headUri(
-      _uri(fileName: fileName),
-      options: Options(
-        contentType: "plain/text",
-        headers: headers,
-      ),
-    );
-    if (response.statusCode == HttpStatus.ok) {
-      return response.headers.map.map(
-        (key, value) => MapEntry(key, value.join(",")),
+      final Response<String> response = await _dio.headUri(
+        _uri(fileName: fileName),
+        options: Options(
+          contentType: "plain/text",
+          headers: headers,
+        ),
       );
-    }
+      if (response.statusCode == HttpStatus.ok) {
+        return response.headers.map.map(
+          (key, value) => MapEntry(key, value.join(",")),
+        );
+      }
 
-    final String message = response.data ?? "";
-    throw AzureStorageException(
-      message,
-      response.statusCode ?? 0,
-      response.headers.map,
-    );
+      final String message = response.data ?? "";
+      throw AzureStorageException(
+        message,
+        response.statusCode ?? 0,
+        response.headers.map,
+      );
+    } catch (e) {
+      _progressSubj.addError(e);
+      rethrow;
+    }
   }
 
   /// Append block to blob.
@@ -200,29 +211,39 @@ class AzureStorage {
       !(body != null && bodyBytes != null),
       "'body' and 'bodyBytes' are exclusive",
     );
-    _fileSize = fileSize;
-    // debugPrint("Filesize: $fileSize");
-    // debugPrint("part: $part");
+    try {
+      if (AzureUploadFile.kaboomizer && part == 2) {
+        AzureUploadFile.kaboomizer = false;
+        throw Exception("KABOOM!!!");
+      }
 
-    final dynamic requestBody = bodyBytes ?? body;
+      _fileSize = fileSize;
+      // debugPrint("Filesize: $fileSize");
+      // debugPrint("part: $part");
 
-    final Response<String> response = await _dio.putUri(
-      _uri(fileName: fileName, queryParameters: {"comp": "appendblock"}),
-      data: requestBody,
-      options: Options(
-        contentType: contentType,
-        headers: headers,
-      ),
-      onSendProgress: (count, total) => _updateProgressSubj(part, count),
-    );
+      final dynamic requestBody = bodyBytes ?? body;
 
-    if (response.statusCode == HttpStatus.created) return;
+      final Response<String> response = await _dio.putUri(
+        _uri(fileName: fileName, queryParameters: {"comp": "appendblock"}),
+        data: requestBody,
+        options: Options(
+          contentType: contentType,
+          headers: headers,
+        ),
+        onSendProgress: (count, total) => _updateProgressSubj(part, count),
+      );
 
-    final String message = response.data ?? "";
-    throw AzureStorageException(
-      message,
-      response.statusCode ?? 0,
-      response.headers.map,
-    );
+      if (response.statusCode == HttpStatus.created) return;
+
+      final String message = response.data ?? "";
+      throw AzureStorageException(
+        message,
+        response.statusCode ?? 0,
+        response.headers.map,
+      );
+    } catch (e) {
+      _progressSubj.addError(e);
+      rethrow;
+    }
   }
 }

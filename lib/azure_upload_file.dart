@@ -9,6 +9,7 @@ import "package:cross_file/cross_file.dart";
 import "package:crypto/crypto.dart";
 import "package:flutter/foundation.dart";
 import "package:mime/mime.dart";
+import "package:rxdart/rxdart.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 export "src/azure_storage.dart";
@@ -18,8 +19,12 @@ class AzureUploadFile {
   AzureStorage? _azureStorage;
   late int _chunkSize;
 
+  static bool kaboomizer = true;
+
   bool _initialized = false;
   bool _isPaused = true;
+  Map<int, int>? _progressMap;
+  XFile? _xFile;
 
   static const String _filePathKey = "filePath";
   static const String _fileNameWithoutExtKey = "fileNameWithoutExt";
@@ -30,12 +35,28 @@ class AzureUploadFile {
 
   AzureUploadFile();
 
-  void initWithSasLink(String sasLink) {
+  Stream<double> get _progressStream => _azureStorage!.progressStream
+      .doOnData((map) {
+        _progressMap = map;
+      })
+      .map<double>(
+        (progressMap) => progressMap.values.isEmpty
+            ? 0
+            : progressMap.values.reduce((a, b) => a + b) /
+                _azureStorage!.fileSize,
+      )
+      .map((val) => double.parse(val.toStringAsFixed(2)))
+      .distinct();
+
+  Future<void> initWithSasLink(String sasLink, {bool isResume = false}) async {
     if (!_initialized) {
       throw Exception("You have to call first config()");
     }
-    _azureStorage = AzureStorage.parseSasLink(sasLink);
-    _prefs.setString(_sasLinkKey, sasLink);
+    if (!isResume) _progressMap = const {};
+
+    _azureStorage =
+        AzureStorage.parseSasLink(sasLink, actualProgress: _progressMap);
+    await _prefs.setString(_sasLinkKey, sasLink);
   }
 
   Future<void> config({int chunkSize = 1024 * 1024}) async {
@@ -54,16 +75,17 @@ class AzureUploadFile {
     if (!_initialized) {
       throw Exception("You have to call first config()");
     }
+    _xFile = file;
     _uploadStream(
       file,
       fileNameWithoutExt: fileNameWithoutExt,
       resume: resume,
     );
 
-    return _azureStorage!.progressStream;
+    return _progressStream;
   }
 
-  Stream<double> resumeUploadFile() {
+  Future<Stream<double>> resumeUploadFile() async {
     if (!_initialized) {
       throw Exception("You have to call first config()");
     }
@@ -75,12 +97,13 @@ class AzureUploadFile {
       throw Exception("Not found upload to resume");
     }
     if (_azureStorage == null && sasLink.isNotEmpty) {
-      initWithSasLink(sasLink);
+      await initWithSasLink(sasLink, isResume: true);
+    } else if (_azureStorage != null) {
+      _azureStorage!.initStream(_progressMap);
     }
-    final XFile file = XFile(filePath);
-
+    _xFile ??= XFile(filePath);
     return uploadFile(
-      file,
+      _xFile!,
       fileNameWithoutExt: fileNameWithoutExt,
       resume: true,
     );
@@ -129,8 +152,8 @@ class AzureUploadFile {
       offsetPos = await _getVideoContentLength(fileName);
     }
 
-    _prefs.setString(_filePathKey, file.path);
-    _prefs.setString(_fileNameWithoutExtKey, fileNameWithoutExt);
+    await _prefs.setString(_filePathKey, file.path);
+    await _prefs.setString(_fileNameWithoutExtKey, fileNameWithoutExt);
 
     final ChunkedStreamReader<int> fileReader =
         ChunkedStreamReader(file.openRead(offsetPos));
@@ -171,12 +194,13 @@ class AzureUploadFile {
       }
       if (nextBytes.isEmpty == true) {
         _deletePrefs();
+        await fileReader.cancel();
         // debugPrint('AzureUploadFile: completed');
       }
     } finally {
-      fileReader.cancel();
       if (nextBytes?.isEmpty == true) {
         _azureStorage!.closeStream();
+        _xFile = null;
         _isPaused = true;
       }
       // debugPrint('AzureUploadFile: exited');
