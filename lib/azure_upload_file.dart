@@ -1,17 +1,17 @@
 library azure_upload_file;
 
-import 'dart:async';
-import 'dart:convert';
+import "dart:async";
+import "dart:convert";
 
-import 'package:async/async.dart';
-import 'package:azure_upload_file/src/azure_storage.dart';
-import 'package:flutter/foundation.dart';
-import 'package:mime/mime.dart';
-import 'package:cross_file/cross_file.dart';
-import 'package:crypto/crypto.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import "package:async/async.dart";
+import "package:azure_upload_file/src/azure_storage.dart";
+import "package:cross_file/cross_file.dart";
+import "package:crypto/crypto.dart";
+import "package:flutter/foundation.dart";
+import "package:mime/mime.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
-export 'src/azure_storage.dart';
+export "src/azure_storage.dart";
 
 class AzureUploadFile {
   late SharedPreferences _prefs;
@@ -21,12 +21,12 @@ class AzureUploadFile {
   bool _initialized = false;
   bool _isPaused = true;
 
-  static const String _filePathKey = 'filePath';
-  static const String _fileNameWithoutExtKey = 'fileNameWithoutExt';
-  static const String _sasLinkKey = 'sasLinkKey';
+  static const String _filePathKey = "filePath";
+  static const String _fileNameWithoutExtKey = "fileNameWithoutExt";
+  static const String _sasLinkKey = "sasLinkKey";
 
-  static const String _offsetHeaderKey = 'x-ms-blob-condition-appendpos';
-  static const String _md5ChecksumHeaderKey = 'Content-MD5';
+  static const String _offsetHeaderKey = "x-ms-blob-condition-appendpos";
+  static const String _md5ChecksumHeaderKey = "Content-MD5";
 
   AzureUploadFile();
 
@@ -48,7 +48,7 @@ class AzureUploadFile {
 
   Stream<double> uploadFile(
     XFile file, {
-    String fileNameWithoutExt = 'video',
+    String fileNameWithoutExt = "video",
     bool resume = false,
   }) {
     if (!_initialized) {
@@ -112,12 +112,12 @@ class AzureUploadFile {
 
   Future<int> _getVideoContentLength(String fileName) async {
     final Map<String, String> res = await _getVideoMeta(fileName);
-    return int.tryParse(res['content-length'] ?? '0') ?? 0;
+    return int.tryParse(res["content-length"] ?? "0") ?? 0;
   }
 
   Future<void> _uploadStream(
     XFile file, {
-    String fileNameWithoutExt = 'video',
+    String fileNameWithoutExt = "video",
     bool resume = false,
   }) async {
     final String fileName = "$fileNameWithoutExt.${file.path.split('.').last}";
@@ -138,12 +138,10 @@ class AzureUploadFile {
     _isPaused = false;
     try {
       nextBytes = await fileReader.readBytes(_chunkSize);
-      // when there are no listeners, we pause uploading.
-      // with firstCall we can resume correctly after a pause since
-      // there are no listeners yet
+      // when _isPaused is true we pause the upload
       while (nextBytes!.isNotEmpty && !_isPaused) {
         final Map<String, String> headers = {
-          _offsetHeaderKey: offsetPos.toString()
+          _offsetHeaderKey: offsetPos.toString(),
         };
         final Digest digestBlock = md5.convert(nextBytes);
         final String md5Checksum = base64.encode(digestBlock.bytes);
@@ -173,7 +171,7 @@ class AzureUploadFile {
       }
       if (nextBytes.isEmpty == true) {
         _deletePrefs();
-        debugPrint('AzureUploadFile: completed');
+        // debugPrint('AzureUploadFile: completed');
       }
     } finally {
       fileReader.cancel();
@@ -181,7 +179,7 @@ class AzureUploadFile {
         _azureStorage!.closeStream();
         _isPaused = true;
       }
-      debugPrint('AzureUploadFile: exited');
+      // debugPrint('AzureUploadFile: exited');
     }
   }
 }

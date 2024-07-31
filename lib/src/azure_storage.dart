@@ -1,9 +1,10 @@
-import 'dart:async';
+import "dart:async";
+import "dart:io";
 
-import 'package:azure_upload_file/src/azure_storage_exception.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import 'package:rxdart/rxdart.dart';
+import "package:azure_upload_file/src/azure_storage_exception.dart";
+import "package:dio/dio.dart";
+import "package:flutter/foundation.dart";
+import "package:rxdart/rxdart.dart";
 
 /// Blob type
 enum BlobType {
@@ -18,19 +19,18 @@ class AzureStorage {
   late BehaviorSubject<Map<int, int>> _progressSubj;
   late int _fileSize;
 
-  static const String queryPathKey = 'QueryPath';
-  static const String queryParamsKey = 'QueryParams';
+  static const String queryPathKey = "QueryPath";
+  static const String queryParamsKey = "QueryParams";
 
   AzureStorage.parseSasLink(String sasLink) {
     try {
-      final Map<String, String> m = {};
-      final List<String> urlSplitted = sasLink.split('?');
-      m[queryPathKey] = urlSplitted[0];
-      m[queryParamsKey] = urlSplitted[1];
-      _config = m;
+      _config = {};
+      final List<String> urlSplitted = sasLink.split("?");
+      _config[queryPathKey] = urlSplitted[0];
+      _config[queryParamsKey] = urlSplitted[1];
       _progressSubj = BehaviorSubject.seeded(_progressValue);
     } catch (e) {
-      throw Exception('Parse error.');
+      throw Exception("Parse error.");
     }
   }
 
@@ -59,16 +59,16 @@ class AzureStorage {
   }
 
   Uri _uri({
-    String fileName = '/',
+    String fileName = "/",
     Map<String, String>? queryParameters,
   }) {
     final String? queryPath = _config[queryPathKey];
     final String? queryParams = _config[queryParamsKey];
-    String url = '$queryPath/$fileName?$queryParams';
+    String url = "$queryPath/$fileName?$queryParams";
 
     if (queryParameters != null) {
       final List<String> list = List.empty(growable: true);
-      queryParameters.forEach((k, v) => list.add('$k=$v'));
+      queryParameters.forEach((k, v) => list.add("$k=$v"));
       url = '$url&${list.join('&')}';
     }
 
@@ -88,14 +88,22 @@ class AzureStorage {
     Map<String, String>? appendHeaders,
     required int fileSize,
   }) async {
+    assert(
+      body != null || bodyBytes != null,
+      "'body' or 'bodyBytes' are exclusive and mandatory",
+    );
+    assert(
+      !(body != null && bodyBytes != null),
+      "'body' and 'bodyBytes' are exclusive",
+    );
     _fileSize = fileSize;
     final Map<String, dynamic> requestHeaders = {
-      'x-ms-blob-type':
-          type == BlobType.appendBlob ? 'AppendBlob' : 'BlockBlob',
-      'x-ms-blob-content-disposition': 'inline',
+      "x-ms-blob-type":
+          type == BlobType.appendBlob ? "AppendBlob" : "BlockBlob",
+      "x-ms-blob-content-disposition": "inline",
     };
     headers?.forEach((key, value) {
-      requestHeaders['x-ms-meta-$key'] = value;
+      requestHeaders["x-ms-meta-$key"] = value;
     });
 
     dynamic requestBody;
@@ -106,7 +114,7 @@ class AzureStorage {
         requestBody = body;
       }
     } else {
-      requestBody = '';
+      requestBody = "";
     }
 
     final Response<String> response = await _dio.putUri(
@@ -118,7 +126,7 @@ class AzureStorage {
       ),
       onSendProgress: (count, total) => _updateProgressSubj(0, count),
     );
-    if (response.statusCode == 201) {
+    if (response.statusCode == HttpStatus.created) {
       if (type == BlobType.appendBlob && (body != null || bodyBytes != null)) {
         await appendBlock(
           fileName,
@@ -133,7 +141,7 @@ class AzureStorage {
       return;
     }
 
-    final String message = response.data ?? '';
+    final String message = response.data ?? "";
     throw AzureStorageException(
       message,
       response.statusCode ?? 0,
@@ -144,14 +152,13 @@ class AzureStorage {
   ///
   /// GetBlobMeta
   ///
-  /// `body` and `bodyBytes` are exclusive and mandatory.
   Future<Map<String, String>> getBlobMetaData(
     String fileName, {
     Map<String, String>? headers,
   }) async {
     final Map<String, dynamic> requestHeaders = {};
     headers?.forEach((key, value) {
-      requestHeaders['x-ms-meta-$key'] = value;
+      requestHeaders["x-ms-meta-$key"] = value;
     });
 
     final Response<String> response = await _dio.headUri(
@@ -161,13 +168,13 @@ class AzureStorage {
         headers: headers,
       ),
     );
-    if (response.statusCode == 200) {
+    if (response.statusCode == HttpStatus.ok) {
       return response.headers.map.map(
-        (key, value) => MapEntry(key, value.join(',')),
+        (key, value) => MapEntry(key, value.join(",")),
       );
     }
 
-    final String message = response.data ?? '';
+    final String message = response.data ?? "";
     throw AzureStorageException(
       message,
       response.statusCode ?? 0,
@@ -185,14 +192,22 @@ class AzureStorage {
     String? contentType,
     required int fileSize,
   }) async {
+    assert(
+      body != null || bodyBytes != null,
+      "'body' or 'bodyBytes' are exclusive and mandatory",
+    );
+    assert(
+      !(body != null && bodyBytes != null),
+      "'body' and 'bodyBytes' are exclusive",
+    );
     _fileSize = fileSize;
-    debugPrint("Filesize: $fileSize");
-    debugPrint("part: $part");
+    // debugPrint("Filesize: $fileSize");
+    // debugPrint("part: $part");
 
-    dynamic requestBody = bodyBytes ?? body;
+    final dynamic requestBody = bodyBytes ?? body;
 
     final Response<String> response = await _dio.putUri(
-      _uri(fileName: fileName, queryParameters: {'comp': 'appendblock'}),
+      _uri(fileName: fileName, queryParameters: {"comp": "appendblock"}),
       data: requestBody,
       options: Options(
         contentType: contentType,
@@ -201,9 +216,9 @@ class AzureStorage {
       onSendProgress: (count, total) => _updateProgressSubj(part, count),
     );
 
-    if (response.statusCode == 201) return;
+    if (response.statusCode == HttpStatus.created) return;
 
-    final String message = response.data ?? '';
+    final String message = response.data ?? "";
     throw AzureStorageException(
       message,
       response.statusCode ?? 0,
