@@ -1,4 +1,78 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer: 
+  exclude:
+      - "**/*.g.dart"
+      - "*/di.config.dart"
+      - "test"
+
+linter:
+  rules:
+    ## Error rules
+    always_use_package_imports: true                        # Avoid relative imports for files in lib/ such "../<file_name.dart>".
+    avoid_empty_else: true                                  # Avoid empty else statements.
+    avoid_slow_async_io: true                               # Avoid slow async dart:io methods because they are much slower than their synchronous counterparts.
+    cancel_subscriptions: true                              # Cancel instances of dart.async.StreamSubscription to prevents memory leaks and unexpected behavior.
+    close_sinks: true                                       # Close instances of dart.core.Sink to prevents memory leaks and unexpected behavior.
+    control_flow_in_finally: true                           # Avoid control flow in finally blocks that will inevitably cause unexpected behavior that is hard to debug.
+    discarded_futures: false                                # Don’t invoke asynchronous functions in non-async blocks.
+    empty_statements: true                                  # Avoid empty statements.
+    hash_and_equals: true                                   # Always override hashCode if overriding ==.
+    literal_only_boolean_expressions: true                  # Boolean expression composed only with literals.
+    no_adjacent_strings_in_list: true                       # Don’t use adjacent strings in list.
+    no_duplicate_case_values: true                          # Don’t use more than one case with same value.
+    prefer_void_to_null: true                               # Don’t use the Null type, unless you are positive that you don’t want void.
+    test_types_in_equals: true                              # Test type arguments in operator ==(Object other).
+    throw_in_finally: true                                  # Avoid throw in finally block.
+    unnecessary_statements: true                            # Avoid using unnecessary statements.
+    unrelated_type_equality_checks: true                    # Equality operator == invocation with references of unrelated types.
+    use_build_context_synchronously: true                   # Do not use BuildContexts across async gaps.
+    use_key_in_widget_constructors: false                   # Use key in widget constructors.
+    valid_regexps: true                                     # Use valid regular expression syntax.
+
+    ## Style rules
+    always_put_control_body_on_new_line: false              # Separate the control structure expression from its statement.
+    always_specify_types: false                             # Specify type annotations.
+    annotate_overrides: true                                # Annotate overridden members.
+    avoid_bool_literals_in_conditional_expressions: true    # Avoid bool literals in conditional expressions.
+    avoid_unnecessary_containers: true                      # Avoid unnecessary containers that has no effect and makes code needlessly more complex.
+    avoid_unused_constructor_parameters: true               # Avoid defining unused parameters in constructors.
+    avoid_void_async: true                                  # Avoid async functions that return void.
+    await_only_futures: true                                # Await only futures.
+    camel_case_extensions: true                             # Name extensions using UpperCamelCase.
+    camel_case_types: true                                  # Name types using UpperCamelCase.
+    combinators_ordering: true                              # Sort combinator names alphabetically.
+    constant_identifier_names: false                        # Prefer using lowerCamelCase for constant names.
+    curly_braces_in_flow_control_structures: true           # DO use curly braces for all flow control structures.
+    directives_ordering: true                               # Adhere to Effective Dart Guide directives sorting conventions.
+    empty_catches: true                                     # Avoid empty catch blocks.
+    empty_constructor_bodies: true                          # Use ; instead of {} for empty constructor bodies.
+    file_names: true                                        # Name source files using lowercase_with_underscores.
+    lines_longer_than_80_chars: false                       # Avoid lines longer than 80 characters.
+    missing_whitespace_between_adjacent_strings: true       # Missing whitespace between adjacent strings.
+    null_closures: true                                     # Do not pass null as an argument where a closure is expected.
+    prefer_conditional_assignment: true                     # Prefer using ??= over testing for null.
+    prefer_const_declarations: true                         # Prefer const over final for declarations.
+    prefer_contains: true                                   # Use contains for List and String instances.
+    prefer_final_fields: true                               # Private field could be final.
+    prefer_final_in_for_each: true                          # Prefer final in for-each loop variable if reference is not reassigned.
+    prefer_final_locals: true                               # Prefer final for variable declarations if they are not reassigned.
+    prefer_for_elements_to_map_fromIterable: true           # Prefer ‘for’ elements when building maps from iterables.
+    prefer_if_null_operators: true                          # Prefer using if null operators.
+    prefer_initializing_formals: true                       # Use initializing formals when possible.
+    prefer_interpolation_to_compose_strings: true           # Use interpolation to compose strings and values.
+    prefer_is_empty: true                                   # Use isEmpty for Iterables and Maps.
+    prefer_is_not_empty: true                               # Use isNotEmpty for Iterables and Maps.
+    prefer_is_not_operator: true                            # Prefer is! operator.
+    prefer_iterable_whereType: true                         # Prefer to use whereType on iterable.
+    require_trailing_commas: true                           # Use trailing commas for all function calls and declarations.
+    sized_box_for_whitespace: true                          # SizedBox for whitespace.
+    sort_child_properties_last: true                        # Sort child properties last in widget instance creations.
+    unawaited_futures: false                                # Future results in async function bodies must be awaited or marked unawaited using dart:async.
+    use_is_even_rather_than_modulo: true                    # Prefer intValue.isOdd/isEven instead of checking the result of % 2.
+    prefer_double_quotes: true                              # Prefer double quotes
+    
+
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
+

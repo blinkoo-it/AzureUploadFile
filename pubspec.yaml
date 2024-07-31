@@ -12,18 +12,17 @@ dependencies:
     sdk: flutter
 
   async: ^2.11.0
-  chunked_stream: ^1.4.2
-  cross_file: ^0.3.3+8
+  cross_file: ^0.3.4+1
   crypto: ^3.0.3
-  http: ^1.1.2
-  mime_type: ^1.0.0
-  rxdart: ^0.27.7
+  dio: ^5.4.1
+  mime: ^1.0.5
+  rxdart: ^0.28.0
   shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^1.0.4
+  flutter_lints: ^4.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
