@@ -38,6 +38,7 @@ class AzureStorage {
     }
   }
 
+  // initialize progress stream with stored progress value if available
   void initStream(Map<String, int>? actualProgress) {
     _progressSubj = BehaviorSubject.seeded(actualProgress ?? const {});
   }
@@ -48,6 +49,7 @@ class AzureStorage {
 
   Stream<Map<String, int>> get progressStream => _progressSubj.stream;
 
+  // update the progress stream with the sent bytes of the current uploading part
   void _updateProgressSubj(String part, int count) {
     _progressSubj.add({
       ..._progressSubj.value,
@@ -204,8 +206,6 @@ class AzureStorage {
     );
 
     _fileSize = fileSize;
-    // debugPrint("Filesize: $fileSize");
-    // debugPrint("part: $part");
 
     final dynamic requestBody = bodyBytes ?? body;
 
