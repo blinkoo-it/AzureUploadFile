@@ -58,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? pathImage;
 
   final AzureUploadFile azureStorage = AzureUploadFile();
-  StreamSubscription<double>? streamSubscription;
+  StreamSubscription<AzureProgressMessage>? streamSubscription;
 
   void _addFile() async {
     streamSubscription?.cancel();
@@ -73,13 +73,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     await azureStorage.config();
     azureStorage.initWithSasLink(
-      "https://amsstoragestage.blob.core.windows.net/temp-cbde9b4e-4a15-450d-9bb1-408b62ea5574?sv=2022-11-02&se=2024-08-01T21%3A35%3A12Z&sr=c&sp=rw&sig=42eFbf6kHmAIggNhW4kGTQIeyrn6CH6od01yduwm6yA%3D",
+      "https://amsstoragestage.blob.core.windows.net/temp-cbde9b4e-4a15-450d-9bb1-408b62ea5574?sv=2022-11-02&se=2024-08-02T01%3A20%3A43Z&sr=c&sp=rw&sig=C90AR60Ty9Vl5vN14MWz6A8CsWFNTkKe3DSVUquFtSo%3D",
     );
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
     streamSubscription = azureStorage.uploadFile(video).listen(
       (event) {
         setState(() {
-          _counter = (event * 100).toInt().toString();
+          _counter = (event.progress * 100).toInt().toString();
         });
         debugPrint("Your upload progress: $_counter%");
       },
@@ -93,23 +93,8 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void resumeUpload() async {
-    streamSubscription?.cancel();
-    streamSubscription = (await azureStorage.resumeUploadFile()).listen(
-      (event) {
-        setState(() {
-          _counter = (event * 100).toInt().toString();
-        });
-        debugPrint("Your upload progress: ${event * 100}%");
-      },
-      onError: (e) {
-        debugPrint(e.toString());
-      },
-      onDone: () {
-        debugPrint("Completed");
-      },
-      cancelOnError: true,
-    );
+  void resumeUpload() {
+    azureStorage.resumeUploadFile();
   }
 
   void cancelVideo() async {
