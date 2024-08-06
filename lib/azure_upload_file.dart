@@ -152,10 +152,10 @@ class AzureUploadFile {
     _isPaused = true;
   }
 
-  void cancelUploadFile() {
-    _deletePrefs();
+  Future<void> cancelUploadFile() async {
     // close azure storage stream
     _azureStorage?.closeStream();
+    await _deletePrefs();
     // close AND DELETE the error stream (this permit the use of the library inside an isolate)
     _errorSubj?.close();
     _errorSubj = null;
