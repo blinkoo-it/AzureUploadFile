@@ -19,7 +19,7 @@ export "src/dto/azure_progress_message.dart";
 class AzureUploadFile {
   late SharedPreferences _prefs;
   AzureStorage? _azureStorage;
-  BehaviorSubject<Object?>? _errorSubj;
+  BehaviorSubject<Object?>? _errorSubj = BehaviorSubject();
   late int _chunkSize;
 
   bool _initialized = false;
@@ -158,7 +158,7 @@ class AzureUploadFile {
     await _deletePrefs();
     // close AND DELETE the error stream (this permit the use of the library inside an isolate)
     _errorSubj?.close();
-    _errorSubj = null;
+    _errorSubj = BehaviorSubject();
     // reset isPaused value
     _isPaused = true;
     debugPrint("AzureUploadFile: aborted");
