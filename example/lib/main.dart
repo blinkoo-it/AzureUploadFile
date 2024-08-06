@@ -76,7 +76,7 @@ class _MyHomePageState extends State<MyHomePage> {
       "https://amsstoragestage.blob.core.windows.net/temp-cbde9b4e-4a15-450d-9bb1-408b62ea5574?sv=2022-11-02&se=2024-08-02T01%3A20%3A43Z&sr=c&sp=rw&sig=C90AR60Ty9Vl5vN14MWz6A8CsWFNTkKe3DSVUquFtSo%3D",
     );
     //await azureBlob.putBlob('video.mp4', bodyBytes: await video.readAsBytes(), contentType: 'video/mp4');
-    streamSubscription = azureStorage.uploadFile(video).listen(
+    streamSubscription = (await azureStorage.uploadFile(video)).listen(
       (event) {
         setState(() {
           _counter = (event.progress * 100).toInt().toString();

@@ -16,12 +16,9 @@ class AzureStorage {
   late Map<String, String> _config;
   final Dio _dio = Dio();
   late BehaviorSubject<Map<String, int>> _progressSubj;
-  late int _fileSize;
 
   static const String queryPathKey = "QueryPath";
   static const String queryParamsKey = "QueryParams";
-
-  int get fileSize => _fileSize;
 
   AzureStorage.parseSasLink(
     String sasLink, {
@@ -100,7 +97,6 @@ class AzureStorage {
       !(body != null && bodyBytes != null),
       "'body' and 'bodyBytes' are exclusive",
     );
-    _fileSize = fileSize;
     final Map<String, dynamic> requestHeaders = {
       "x-ms-blob-type":
           type == BlobType.appendBlob ? "AppendBlob" : "BlockBlob",
@@ -139,7 +135,7 @@ class AzureStorage {
           bodyBytes: bodyBytes,
           headers: appendHeaders,
           contentType: contentType,
-          fileSize: _fileSize,
+          fileSize: fileSize,
         );
       }
       return;
@@ -204,8 +200,6 @@ class AzureStorage {
       !(body != null && bodyBytes != null),
       "'body' and 'bodyBytes' are exclusive",
     );
-
-    _fileSize = fileSize;
 
     final dynamic requestBody = bodyBytes ?? body;
 

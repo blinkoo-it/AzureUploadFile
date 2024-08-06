@@ -21,6 +21,7 @@ class AzureUploadFile {
   AzureStorage? _azureStorage;
   BehaviorSubject<Object?>? _errorSubj = BehaviorSubject();
   late int _chunkSize;
+  late int _fileSize;
 
   bool _initialized = false;
   bool _isPaused = true;
@@ -50,8 +51,7 @@ class AzureUploadFile {
           // calculate the overall progress
           double progress = (progressMap as Map<String, int>).isEmpty
               ? 0
-              : progressMap.values.reduce((a, b) => a + b) /
-                  _azureStorage!.fileSize;
+              : progressMap.values.reduce((a, b) => a + b) / _fileSize;
           progress = double.parse(progress.toStringAsFixed(2));
           if (e != null) debugPrint("error $e");
           // emit the progress and the error if present
@@ -72,8 +72,11 @@ class AzureUploadFile {
       }
       Map<String, int> progressMap = const {};
       if (isResume) {
+        print("InitWithSasLink from resume");
         final String mapString = _prefs.getString(_progressMapKey)!;
-        progressMap = jsonDecode(mapString) as Map<String, int>;
+        progressMap = (jsonDecode(mapString) as Map<String, dynamic>).map(
+          (key, value) => MapEntry(key, value as int),
+        );
       }
 
       _azureStorage = AzureStorage.parseSasLink(
@@ -82,6 +85,7 @@ class AzureUploadFile {
       );
       await _prefs.setString(_sasLinkKey, sasLink);
     } catch (e) {
+      print("InitWithSasLink error $e");
       _emitError(e);
     }
   }
@@ -94,17 +98,19 @@ class AzureUploadFile {
     }
   }
 
-  Stream<AzureProgressMessage> uploadFile(
+  Future<Stream<AzureProgressMessage>> uploadFile(
     XFile file, {
     String fileNameWithoutExt = "video",
     bool resume = false,
-  }) {
+  }) async {
     try {
       if (!_initialized) {
         throw Exception("You have to call first config()");
       }
       _errorSubj?.close();
       _errorSubj = BehaviorSubject.seeded(null);
+      final int end = await file.length();
+      _fileSize = end;
       _uploadStream(
         file,
         fileNameWithoutExt: fileNameWithoutExt,
@@ -117,7 +123,7 @@ class AzureUploadFile {
     return _progressStream;
   }
 
-  void resumeUploadFile() {
+  Future<Stream<AzureProgressMessage>> resumeUploadFile() async {
     try {
       if (!_initialized) {
         throw Exception("You have to call first config()");
@@ -130,7 +136,9 @@ class AzureUploadFile {
       if (filePath == null || fileNameWithoutExt == null || sasLink == null) {
         throw Exception("Not found upload to resume");
       }
+      print("azureStorage $_azureStorage - sasLink $sasLink");
       if (_azureStorage == null && sasLink.isNotEmpty) {
+        print("Resuming with azureStorage null and sasLink");
         initWithSasLink(sasLink, isResume: true);
       }
 
@@ -138,7 +146,7 @@ class AzureUploadFile {
       _errorSubj!.add(null);
 
       final XFile file = XFile(filePath);
-      uploadFile(
+      await uploadFile(
         file,
         fileNameWithoutExt: fileNameWithoutExt,
         resume: true,
@@ -146,6 +154,8 @@ class AzureUploadFile {
     } catch (e) {
       _emitError(e);
     }
+
+    return _progressStream;
   }
 
   void pauseUploadFile() {
@@ -195,7 +205,7 @@ class AzureUploadFile {
     bool resume = false,
   }) async {
     final String fileName = "$fileNameWithoutExt.${file.path.split('.').last}";
-    final int end = await file.length();
+
     final String? contentType = lookupMimeType(file.path);
     int offsetPos = 0;
 
@@ -227,7 +237,7 @@ class AzureUploadFile {
             contentType: contentType,
             type: BlobType.appendBlob,
             appendHeaders: headers,
-            fileSize: end,
+            fileSize: _fileSize,
           );
         } else {
           await _azureStorage!.appendBlock(
@@ -236,7 +246,7 @@ class AzureUploadFile {
             bodyBytes: nextBytes,
             headers: headers,
             contentType: contentType,
-            fileSize: end,
+            fileSize: _fileSize,
           );
         }
         offsetPos += nextBytes.length;
