@@ -21,7 +21,6 @@ class AzureUploadFile {
   AzureStorage? _azureStorage;
   BehaviorSubject<Object?>? _errorSubj = BehaviorSubject();
   late int _chunkSize;
-  late int _fileSize;
 
   bool _initialized = false;
   bool _isPaused = true;
@@ -30,6 +29,7 @@ class AzureUploadFile {
   static const String _fileNameWithoutExtKey = "fileNameWithoutExt";
   static const String _sasLinkKey = "sasLinkKey";
   static const String _progressMapKey = "progressMapKey";
+  static const String _fileSizeKey = "fileSizeKey";
 
   static const String _offsetHeaderKey = "x-ms-blob-condition-appendpos";
   static const String _md5ChecksumHeaderKey = "Content-MD5";
@@ -51,7 +51,8 @@ class AzureUploadFile {
           // calculate the overall progress
           double progress = (progressMap as Map<String, int>).isEmpty
               ? 0
-              : progressMap.values.reduce((a, b) => a + b) / _fileSize;
+              : progressMap.values.reduce((a, b) => a + b) /
+                  (_prefs.getInt(_fileSizeKey) ?? 1);
           progress = double.parse(progress.toStringAsFixed(2));
           if (e != null) debugPrint("error $e");
           // emit the progress and the error if present
@@ -109,10 +110,11 @@ class AzureUploadFile {
       }
       _errorSubj?.close();
       _errorSubj = BehaviorSubject.seeded(null);
-      final int end = await file.length();
-      _fileSize = end;
+      final int fileLength = await file.length();
+      await _prefs.setInt(_fileSizeKey, fileLength);
       _uploadStream(
         file,
+        fileLength,
         fileNameWithoutExt: fileNameWithoutExt,
         resume: resume,
       );
@@ -178,6 +180,8 @@ class AzureUploadFile {
     await _prefs.remove(_filePathKey);
     await _prefs.remove(_fileNameWithoutExtKey);
     await _prefs.remove(_sasLinkKey);
+    await _prefs.remove(_progressMapKey);
+    await _prefs.remove(_fileSizeKey);
   }
 
   bool isPresentUploadToResume() {
@@ -200,7 +204,8 @@ class AzureUploadFile {
   }
 
   Future<void> _uploadStream(
-    XFile file, {
+    XFile file,
+    int fileLength, {
     String fileNameWithoutExt = "video",
     bool resume = false,
   }) async {
@@ -237,7 +242,7 @@ class AzureUploadFile {
             contentType: contentType,
             type: BlobType.appendBlob,
             appendHeaders: headers,
-            fileSize: _fileSize,
+            fileSize: fileLength,
           );
         } else {
           await _azureStorage!.appendBlock(
@@ -246,7 +251,7 @@ class AzureUploadFile {
             bodyBytes: nextBytes,
             headers: headers,
             contentType: contentType,
-            fileSize: _fileSize,
+            fileSize: fileLength,
           );
         }
         offsetPos += nextBytes.length;
