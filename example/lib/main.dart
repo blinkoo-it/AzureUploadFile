@@ -62,9 +62,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _addFile() async {
     streamSubscription?.cancel();
-    final FilePickerResult? pickerResult = await FilePicker.platform.pickFiles(
+    final FilePickerResult? pickerResult = await FilePicker.pickFiles(
       type: FileType.video,
-      allowCompression: false,
+      compressionQuality: 0,
     );
     final path = pickerResult?.files.first.path;
     final XFile video = XFile(path!);
